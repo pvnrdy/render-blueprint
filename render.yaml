@@ -1,35 +1,28 @@
-version: '3'
-
 services:
+  # Database service
   db:
-    image: mysql:latest
-    environment:
-      MYSQL_ROOT_PASSWORD: root
+    type: database
+    databaseName: supertokens
+    plan: FREE  # Adjust plan as needed (see Render pricing)
+    env:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}  # Reference secret from environment variables
       MYSQL_USER: supertokens_user
-      MYSQL_PASSWORD: somePassword
-      MYSQL_DATABASE: supertokens
-    ports:
-      - 3306:3306
-    networks:
-      - app_network
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
-      timeout: 20s
-      retries: 10
+      MYSQL_PASSWORD: ${DB_PASSWORD}  # Reference secret from environment variables
 
+  # SuperTokens service
   supertokens:
-    image: registry.supertokens.io/supertokens/supertokens-mysql:9.0
-    depends_on:
-      db:
-        condition: service_healthy
+    type: web
+    # Consider using a custom Docker image for build flexibility
+    # image: registry.supertokens.io/supertokens/supertokens-mysql:9.0
+    build: .  # Build image from current directory (replace with your build path if needed)
+    env:
+      MYSQL_CONNECTION_URI: mysql://supertokens_user:${DB_PASSWORD}@db:3306/supertokens
+      # Add additional environment variables for SuperTokens configuration here
+      # (refer to SuperTokens documentation for specific variables)
+    envFiles:
+      - .env  # Include environment variables from a separate .env file (optional)
     ports:
       - 3567:3567
-    environment:
-      MYSQL_CONNECTION_URI: mysql://supertokens_user:somePassword@db:3306/supertokens
-    networks:
-      - app_network
-    restart: unless-stopped
     healthcheck:
       test: >
         bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e "GET /hello HTTP/1.1\r\nhost: 127.0.0.1:3567\r\nConnection: close\r\n\r\n" >&3 && cat <&3 | grep "Hello"'
@@ -37,6 +30,7 @@ services:
       timeout: 5s
       retries: 5
 
-networks:
-  app_network:
-    driver: bridge  
+# Environment variables (store these securely in Render's environment variables)
+environment:
+  DB_ROOT_PASSWORD: your_strong_mysql_root_password
+  DB_PASSWORD: your_strong_mysql_password
